@@ -51,7 +51,7 @@ data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags
 data['api_sig'] = flickr.sign(data)
 
 dir = os.path.expandvars(options.dir)
-files = [one for one in os.listdir(dir) if
+files = [os.path.join(dir, one) for one in os.listdir(dir) if
          os.path.isfile(os.path.join(dir, one)) and one.split('.')[-1].lower() in UPLOADED_EXTS]
 
 hooks = dict(response=resp, pre_request=pre_req)
