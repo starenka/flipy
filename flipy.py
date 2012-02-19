@@ -10,7 +10,7 @@ from optparse import OptionParser
 
 API_KEY = 'get yours' #http://www.flickr.com/services/apps/create/apply
 API_SECRET = 'please'
-UPLOADED_EXTS = ['jpg', 'jpeg', 'tif', 'raw', 'png', 'gif']
+UPLOADED_EXTS = ['jpg', 'jpeg', 'tif', 'raw', 'png', 'gif', 'mov', 'avi', 'mpeg', 'mpg', 'mp4']
 
 logger = logging.getLogger('flipy')
 logger.setLevel(logging.INFO)
