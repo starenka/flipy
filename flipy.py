@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # pip install flickrapi requests gevent
 
+from __future__ import division
 import logging, os, sys
 import flickrapi
 from requests import async
@@ -12,7 +13,8 @@ from optparse import OptionParser
 API_KEY = 'get yours' #http://www.flickr.com/services/apps/create/apply
 API_SECRET = 'please'
 EXT_UPLOAD = ('jpg', 'jpeg', 'tif', 'tiff', 'raw', 'png', 'gif')
-MAX_SIZE = 20 * 1048576
+BYTES_IN_MB = 1048576
+MAX_SIZE = 20 * BYTES_IN_MB
 
 logger = logging.getLogger('flipy')
 logger.setLevel(logging.INFO)
@@ -46,15 +48,16 @@ parser.add_option('-c', '--concurrency', action='store', dest='concurrency', def
 dir = os.path.expandvars(options.dir)
 files = []
 for one in os.listdir(dir):
-    full, ext = os.path.join(dir, one), one.split('.')[-1].lower()
-    conds = [os.path.isfile(full), ext in EXT_UPLOAD, os.path.getsize(full) < MAX_SIZE]
-    if all(conds):
-        files.append(full)
+    full = os.path.join(dir, one)
+    ext, size = one.split('.')[-1].lower(), os.path.getsize(full)
+    if all([os.path.isfile(full), ext in EXT_UPLOAD, size < MAX_SIZE]):
+        files.append((full, size))
     else:
-        logging.warning('Skipping file: %s'%full)
+        logging.warning('Skipping file: %s' % full)
 
 if not files:
     sys.exit('No suitable files found in "%s".' % dir)
+logger.info('Uploading %d files (%f MB)' % (len(files), sum(one[1] for one in files)/BYTES_IN_MB))
 
 flickr = flickrapi.FlickrAPI(API_KEY, API_SECRET)
 (token, frob) = flickr.get_token_part_one(perms='write')
@@ -68,7 +71,7 @@ data['api_sig'] = flickr.sign(data)
 
 hooks = dict(response=resp, pre_request=pre_req)
 requests = [async.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
-    files={'photo': open(one, 'rb')}, timeout=int(options.timeout), hooks=hooks)
+    files={'photo': open(one[0], 'rb')}, timeout=int(options.timeout), hooks=hooks)
             for one in files]
 
 async.map(requests, size=int(options.concurrency))
