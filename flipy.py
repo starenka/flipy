@@ -47,11 +47,11 @@ parser.add_option('-c', '--concurrency', action='store', dest='concurrency', def
 
 dir = os.path.expandvars(options.dir)
 files = []
-for one in os.listdir(dir):
+for one in sorted(os.listdir(dir)):
     full = os.path.join(dir, one)
     ext, size = one.split('.')[-1].lower(), os.path.getsize(full)
     if all([os.path.isfile(full), ext in EXT_UPLOAD, size < MAX_SIZE]):
-        files.append((full, size))
+        files.append((full.decode('utf8'), size))
     else:
         logging.warning('Skipping file: %s' % full)
 
