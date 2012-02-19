@@ -2,15 +2,17 @@
 # -*- coding: utf-8 -*-
 # pip install flickrapi requests gevent
 
-import logging, os
+import logging, os, sys
 import flickrapi
 from requests import async
 import xml.etree.ElementTree as ElementTree
 from optparse import OptionParser
 
+
 API_KEY = 'get yours' #http://www.flickr.com/services/apps/create/apply
 API_SECRET = 'please'
-UPLOADED_EXTS = ['jpg', 'jpeg', 'tif', 'raw', 'png', 'gif', 'mov', 'avi', 'mpeg', 'mpg', 'mp4']
+EXT_UPLOAD = ('jpg', 'jpeg', 'tif', 'tiff', 'raw', 'png', 'gif')
+MAX_SIZE = 20 * 1048576
 
 logger = logging.getLogger('flipy')
 logger.setLevel(logging.INFO)
@@ -36,9 +38,23 @@ parser = OptionParser(usage)
 parser.add_option('-d', '--dir', action='store', dest='dir', default=os.getcwd(), help='src directory')
 parser.add_option('-t', '--tags', action='store', dest='tags', default='', help='tags')
 parser.add_option('-p', '--public', action='store_true', dest='public', default=False, help='as public')
-parser.add_option('-c', '--concurrency', action='store', dest='concurrency', default=10,
+parser.add_option('-o', '--timeout', action='store', dest='timeout', default=120, help='timeout for file upload')
+parser.add_option('-c', '--concurrency', action='store', dest='concurrency', default=15,
     help='max simultaneous uploads')
 (options, args) = parser.parse_args()
+
+dir = os.path.expandvars(options.dir)
+files = []
+for one in os.listdir(dir):
+    full, ext = os.path.join(dir, one), one.split('.')[-1].lower()
+    conds = [os.path.isfile(full), ext in EXT_UPLOAD, os.path.getsize(full) < MAX_SIZE]
+    if all(conds):
+        files.append(full)
+    else:
+        logging.warning('Skipping file: %s'%full)
+
+if not files:
+    sys.exit('No suitable files found in "%s".' % dir)
 
 flickr = flickrapi.FlickrAPI(API_KEY, API_SECRET)
 (token, frob) = flickr.get_token_part_one(perms='write')
@@ -50,13 +66,9 @@ data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags
         'is_public': str(int(options.public))}
 data['api_sig'] = flickr.sign(data)
 
-dir = os.path.expandvars(options.dir)
-files = [os.path.join(dir, one) for one in os.listdir(dir) if
-         os.path.isfile(os.path.join(dir, one)) and one.split('.')[-1].lower() in UPLOADED_EXTS]
-
 hooks = dict(response=resp, pre_request=pre_req)
 requests = [async.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
-    files={'photo': open(one, 'rb')}, hooks=hooks)
+    files={'photo': open(one, 'rb')}, timeout=int(options.timeout), hooks=hooks)
             for one in files]
 
 async.map(requests, size=int(options.concurrency))
