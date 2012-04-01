@@ -4,11 +4,11 @@
 
 from __future__ import division
 import logging, os, sys
+
 import flickrapi
 from requests import async
 import xml.etree.ElementTree as ElementTree
 from optparse import OptionParser
-
 
 API_KEY = 'get yours' #http://www.flickr.com/services/apps/create/apply
 API_SECRET = 'please'
@@ -24,8 +24,11 @@ def pre_req(request):
 
 
 def resp(response):
+    global failed
     if response.error:
-        logger.error(response.error)
+        file = response.request.files['photo'].name
+        logger.error(u'Error: %(file)s %(error)s' % {'error': response.error, 'file': file})
+        failed.write(u'%s\n' % file)
     else:
         rsp = ElementTree.fromstring(response.text)
         if rsp.attrib['stat'] == 'ok':
@@ -46,6 +49,8 @@ parser.add_option('-c', '--concurrency', action='store', dest='concurrency', def
 (options, args) = parser.parse_args()
 
 dir = os.path.expandvars(options.dir)
+failed = open('failed', 'a+')
+
 files = []
 for one in sorted(os.listdir(dir)):
     full = os.path.join(dir, one)
@@ -57,7 +62,7 @@ for one in sorted(os.listdir(dir)):
 
 if not files:
     sys.exit('No suitable files found in "%s".' % dir)
-logger.info('Uploading %d files (%f MB)' % (len(files), sum(one[1] for one in files)/BYTES_IN_MB))
+logger.info('Uploading %d files (%f MB)' % (len(files), sum(one[1] for one in files) / BYTES_IN_MB))
 
 flickr = flickrapi.FlickrAPI(API_KEY, API_SECRET)
 (token, frob) = flickr.get_token_part_one(perms='write')
@@ -75,3 +80,4 @@ requests = [async.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, d
             for one in files]
 
 async.map(requests, size=int(options.concurrency))
+failed.close()
