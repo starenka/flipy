@@ -4,11 +4,11 @@
 
 from __future__ import division
 import logging, os, sys
+from optparse import OptionParser
+import xml.etree.ElementTree as ElementTree
 
 import flickrapi
 from requests import async
-import xml.etree.ElementTree as ElementTree
-from optparse import OptionParser
 
 API_KEY = 'get yours' #http://www.flickr.com/services/apps/create/apply
 API_SECRET = 'please'
@@ -20,22 +20,23 @@ logger = logging.getLogger('flipy')
 logger.setLevel(logging.INFO)
 
 def pre_req(request):
-    logger.info(u'Uploading %s' % request.files['photo'].name)
+    logger.info(u'[-] uploading %s' % request.files['photo'].name)
 
 
 def resp(response):
-    global failed
+    global uploaded
     if response.error:
-        file = response.request.files['photo'].name
-        logger.error(u'Error: %(file)s %(error)s' % {'error': response.error, 'file': file})
-        failed.write(u'%s\n' % file)
+        logger.error(
+            u'[!] %(file)s %(error)s' % {'error': response.error, 'file': response.request.files['photo'].name})
     else:
         rsp = ElementTree.fromstring(response.text)
         if rsp.attrib['stat'] == 'ok':
-            logger.info(u'%s upload OK' % response.request.files['photo'].name)
+            file = response.request.files['photo'].name
+            logger.info(u'[+] %s uploaded' % file)
+            uploaded.write(u'%s\n' % file)
         else:
             err = rsp.find('err')
-            logger.error(u'Error: %(code)s: %(msg)s' % err.attrib)
+            logger.error(u'[!] %(code)s: %(msg)s' % err.attrib)
     return response
 
 usage = '%s --help' % __file__
@@ -49,20 +50,25 @@ parser.add_option('-c', '--concurrency', action='store', dest='concurrency', def
 (options, args) = parser.parse_args()
 
 dir = os.path.expandvars(options.dir)
-failed = open('failed', 'a+')
+log_file = os.path.join(dir, '.uploaded')
+if not os.path.exists(log_file):
+    open(log_file, 'w').close()
+with open(log_file, 'r') as f:
+    uploaded_already =  [one.strip() for one in f.readlines()]
+uploaded = open(log_file, 'a+')
 
 files = []
 for one in sorted(os.listdir(dir)):
     full = os.path.join(dir, one)
     ext, size = one.split('.')[-1].lower(), os.path.getsize(full)
-    if all([os.path.isfile(full), ext in EXT_UPLOAD, size < MAX_SIZE]):
+    if all([full not in uploaded_already, os.path.isfile(full), ext in EXT_UPLOAD, size < MAX_SIZE]):
         files.append((full.decode('utf8'), size))
     else:
-        logging.warning('Skipping file: %s' % full)
+        logging.warning('[@] Skipping file: %s' % full)
 
 if not files:
-    sys.exit('No suitable files found in "%s".' % dir)
-logger.info('Uploading %d files (%f MB)' % (len(files), sum(one[1] for one in files) / BYTES_IN_MB))
+    sys.exit('[!] No suitable files found in "%s".' % dir)
+logger.info('[-] Uploading %d files (%f MB)' % (len(files), sum(one[1] for one in files) / BYTES_IN_MB))
 
 flickr = flickrapi.FlickrAPI(API_KEY, API_SECRET)
 (token, frob) = flickr.get_token_part_one(perms='write')
@@ -80,4 +86,4 @@ requests = [async.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, d
             for one in files]
 
 async.map(requests, size=int(options.concurrency))
-failed.close()
+uploaded.close()
