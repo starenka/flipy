@@ -25,18 +25,18 @@ def pre_req(request):
 
 def resp(response):
     global uploaded
+    file = response.request.files['photo'].name
     if response.error:
         logger.error(
-            u'[!] %(file)s %(error)s' % {'error': response.error, 'file': response.request.files['photo'].name})
+            u'[!] %(file)s %(error)s' % {'error': response.error, 'file': file})
     else:
         rsp = ElementTree.fromstring(response.text)
         if rsp.attrib['stat'] == 'ok':
-            file = response.request.files['photo'].name
             logger.info(u'[+] %s uploaded' % file)
-            uploaded.write(u'%s\n' % file)
+            uploaded.write(u'%s\n' % os.path.basename(file))
         else:
             err = rsp.find('err')
-            logger.error(u'[!] %(code)s: %(msg)s' % err.attrib)
+            logger.error(u'[!] %(file)s %(code)s: %(msg)s' % dict(err.attrib, **{'file': file}))
     return response
 
 usage = '%s --help' % __file__
@@ -64,7 +64,7 @@ files = []
 for one in sorted(os.listdir(dir)):
     full = os.path.join(dir, one)
     ext, size = one.split('.')[-1].lower(), os.path.getsize(full)
-    if all([full not in uploaded_already, os.path.isfile(full), ext in EXT_UPLOAD, size < MAX_SIZE]):
+    if all([one not in uploaded_already, os.path.isfile(full), ext in EXT_UPLOAD, size < MAX_SIZE]):
         files.append((full.decode('utf8'), size))
     else:
         logging.warning('[@] Skipping file: %s' % full)
@@ -79,6 +79,17 @@ if not token:
     raw_input("Wait for browser to be spawned, accept permissions and hit ENTER to continue\n")
 flickr.get_token_part_two((token, frob))
 
+data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags': options.tags,
+        'is_public': str(int(options.public))}
+data['api_sig'] = flickr.sign(data)
+
+hooks = dict(response=resp, pre_request=pre_req)
+requests = [async.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
+    files={'photo': open(one[0], 'rb')}, timeout=int(options.timeout), hooks=hooks)
+            for one in files]
+
+async.map(requests, size=int(options.concurrency))
+uploaded.close()
 data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags': options.tags,
         'is_public': str(int(options.public))}
 data['api_sig'] = flickr.sign(data)
