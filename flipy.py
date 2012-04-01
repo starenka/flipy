@@ -50,12 +50,15 @@ parser.add_option('-c', '--concurrency', action='store', dest='concurrency', def
 (options, args) = parser.parse_args()
 
 dir = os.path.expandvars(options.dir)
-log_file = os.path.join(dir, '.uploaded')
+log_file, uploaded_already = os.path.join(dir, '.uploaded'), []
+
 if not os.path.exists(log_file):
-    open(log_file, 'w').close()
-with open(log_file, 'r') as f:
-    uploaded_already =  [one.strip() for one in f.readlines()]
-uploaded = open(log_file, 'a+')
+    f = open(log_file, 'w').close()
+else:
+    f = open(log_file, 'r')
+    uploaded_already = [one.strip() for one in f.readlines()]
+    f.close()
+uploaded = open(log_file, 'a+', 0)
 
 files = []
 for one in sorted(os.listdir(dir)):
