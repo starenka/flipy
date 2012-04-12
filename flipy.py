@@ -84,9 +84,9 @@ data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags
 data['api_sig'] = flickr.sign(data)
 
 hooks = dict(response=resp, pre_request=pre_req)
-requests = [async.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
+requests = (async.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
     files={'photo': open(one[0], 'rb')}, timeout=int(options.timeout), hooks=hooks)
-            for one in files]
+            for one in files)
 
 async.map(requests, size=int(options.concurrency))
 uploaded.close()
