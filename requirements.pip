@@ -1,2 +1,4 @@
 flickrapi==1.4.2
+requests==0.14.1
 grequests==0.1.0
+gevent==0.13.8
