@@ -3,15 +3,14 @@
 # pip install flickrapi grequests gevent
 
 from __future__ import division
-import logging, os, sys
-from optparse import OptionParser
+import os, sys, logging, argparse
 import xml.etree.ElementTree as ElementTree
 
 import flickrapi
 import grequests
 
-API_KEY = '' #http://www.flickr.com/services/apps/create/apply
-API_SECRET = ''
+API_KEY = 'df5cf401ffc46c8404023a1f87e44509' #http://www.flickr.com/services/apps/create/apply
+API_SECRET = '221015f7726277d8'
 EXT_UPLOAD = ('jpg', 'jpeg', 'tif', 'tiff', 'raw', 'png', 'gif')
 BYTES_IN_MB = 1048576
 MAX_SIZE = 20 * BYTES_IN_MB
@@ -39,17 +38,16 @@ def resp(response):
             logger.error(u'[!] %(file)s %(code)s: %(msg)s' % dict(err.attrib, **{'file': file}))
     return response
 
-usage = '%s --help' % __file__
-parser = OptionParser(usage)
-parser.add_option('-d', '--dir', action='store', dest='dir', default=os.getcwd(), help='src directory')
-parser.add_option('-t', '--tags', action='store', dest='tags', default='', help='tags')
-parser.add_option('-p', '--public', action='store_true', dest='public', default=False, help='as public')
-parser.add_option('-o', '--timeout', action='store', dest='timeout', default=120, help='timeout for file upload')
-parser.add_option('-c', '--concurrency', action='store', dest='concurrency', default=9,
-    help='max simultaneous uploads')
-(options, args) = parser.parse_args()
+parser = argparse.ArgumentParser(description='FliPy a simple Flickr CLI uploader')
+parser.add_argument('-d', '--dir', dest='dir', default=os.getcwd(), help='directory to upload')
 
-dir = os.path.expandvars(options.dir)
+parser.add_argument('-t', '--tags', dest='tags', default='', help='tags')
+parser.add_argument('-p', '--public', action='store_true', dest='public', default=False, help='upload as public')
+parser.add_argument('-o', '--timeout', type=int, dest='timeout', default=120, help='timeout for file upload')
+parser.add_argument('-c', '--concurrency', type=int, dest='concurrency', default=9, help='max simultaneous uploads')
+args = parser.parse_args()
+
+dir = os.path.expandvars(args.dir)
 log_file, uploaded_already = os.path.join(dir, '.uploaded'), []
 
 if not os.path.exists(log_file):
@@ -79,14 +77,14 @@ if not token:
     raw_input("Wait for browser to be spawned, accept permissions and hit ENTER to continue\n")
 flickr.get_token_part_two((token, frob))
 
-data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags': options.tags,
-        'is_public': str(int(options.public))}
+data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags': args.tags,
+        'is_public': str(args.public)}
 data['api_sig'] = flickr.sign(data)
 
 hooks = dict(response=resp, pre_request=pre_req)
 requests = (grequests.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
-    files={'photo': open(one[0], 'rb')}, timeout=int(options.timeout), hooks=hooks)
+    files={'photo': open(one[0], 'rb')}, timeout=args.timeout, hooks=hooks)
             for one in files)
 
-grequests.map(requests, size=int(options.concurrency))
+grequests.map(requests, size=int(args.concurrency))
 uploaded.close()
