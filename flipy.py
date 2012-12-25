@@ -9,8 +9,8 @@ import xml.etree.ElementTree as ElementTree
 import flickrapi
 import grequests
 
-API_KEY = 'df5cf401ffc46c8404023a1f87e44509' #http://www.flickr.com/services/apps/create/apply
-API_SECRET = '221015f7726277d8'
+from settings import API_KEY, API_SECRET
+
 EXT_UPLOAD = ('jpg', 'jpeg', 'tif', 'tiff', 'raw', 'png', 'gif')
 BYTES_IN_MB = 1048576
 MAX_SIZE = 20 * BYTES_IN_MB
