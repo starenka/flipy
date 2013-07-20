@@ -78,7 +78,7 @@ if not token:
 flickr.get_token_part_two((token, frob))
 
 data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags': args.tags,
-        'is_public': str(args.public)}
+        'is_public': str(int(args.public))}
 data['api_sig'] = flickr.sign(data)
 
 hooks = dict(response=resp, pre_request=pre_req)
