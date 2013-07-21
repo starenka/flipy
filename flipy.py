@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# pip install flickrapi grequests gevent
 
 from __future__ import division
 import os, sys, logging, argparse
@@ -18,29 +17,8 @@ MAX_SIZE = 20 * BYTES_IN_MB
 logger = logging.getLogger('flipy')
 logger.setLevel(logging.INFO)
 
-def pre_req(request):
-    logger.info(u'[-] uploading %s' % request.files['photo'].name)
-
-
-def resp(response):
-    global uploaded
-    file = response.request.files['photo'].name
-    if response.error:
-        logger.error(
-            u'[!] %(file)s %(error)s' % {'error': response.error, 'file': file})
-    else:
-        rsp = ElementTree.fromstring(response.text)
-        if rsp.attrib['stat'] == 'ok':
-            logger.info(u'[+] %s uploaded' % file)
-            uploaded.write(u'%s\n' % os.path.basename(file))
-        else:
-            err = rsp.find('err')
-            logger.error(u'[!] %(file)s %(code)s: %(msg)s' % dict(err.attrib, **{'file': file}))
-    return response
-
 parser = argparse.ArgumentParser(description='FliPy a simple Flickr CLI uploader')
 parser.add_argument('-d', '--dir', dest='dir', default=os.getcwd(), help='directory to upload')
-
 parser.add_argument('-t', '--tags', dest='tags', default='', help='tags')
 parser.add_argument('-p', '--public', action='store_true', dest='public', default=False, help='upload as public')
 parser.add_argument('-o', '--timeout', type=int, dest='timeout', default=120, help='timeout for file upload')
@@ -81,10 +59,23 @@ data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags
         'is_public': str(int(args.public))}
 data['api_sig'] = flickr.sign(data)
 
-hooks = dict(response=resp, pre_request=pre_req)
+hooks = dict(pre_request=lambda r: logger.info(u'[-] uploading %s' % r.files['photo'].name))
 requests = (grequests.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
-    files={'photo': open(one[0], 'rb')}, timeout=args.timeout, hooks=hooks)
+                           files={'photo': open(one[0], 'rb')}, timeout=args.timeout, hooks=hooks)
             for one in files)
 
-grequests.map(requests, size=int(args.concurrency))
+for response in grequests.imap(requests, size=int(args.concurrency)):
+    file = response.request.files['photo'].name
+    if response.error:
+        logger.error(
+            u'[!] %(file)s %(error)s' % {'error': response.error, 'file': file})
+    else:
+        rsp = ElementTree.fromstring(response.text)
+        if rsp.attrib['stat'] == 'ok':
+            logger.info(u'[+] %s uploaded' % file)
+            uploaded.write(u'%s\n' % os.path.basename(file))
+        else:
+            err = rsp.find('err')
+            logger.error(u'[!] %(file)s %(code)s: %(msg)s' % dict(err.attrib, **{'file': file}))
+
 uploaded.close()
