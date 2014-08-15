@@ -60,7 +60,7 @@ data = {'auth_token': flickr.token_cache.token, 'api_key': flickr.api_key, 'tags
 data['api_sig'] = flickr.sign(data)
 
 hooks = dict(pre_request=lambda r: logger.info(u'[-] uploading %s' % r.files['photo'].name))
-requests = (grequests.post('http://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
+requests = (grequests.post('https://api.flickr.com/%s' % flickr.flickr_upload_form, data=data,
                            files={'photo': open(one[0], 'rb')}, timeout=args.timeout, hooks=hooks)
             for one in files)
 
