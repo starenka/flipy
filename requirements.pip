@@ -1,5 +1,2 @@
-flickrapi==1.4.4
-requests==0.14.1
-grequests==0.1.0
-#gevent==0.13.8 #not installable on some systems now due to libevent mismatch
-git+git://github.com/ellimilial/gevent.git@fcd65292d5ec0d083d7c974a0f3b87eb9c3253ca
+flickrapi~=2.4.0
+workerpool~=0.9.4
